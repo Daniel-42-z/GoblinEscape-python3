@@ -115,7 +115,7 @@ window = pygame.display.set_mode((width, height))
 # NOW create UI elements after pygame is initialized
 hint_toggle = Toggle(20, 20, 60, 25, with_hint, "Show Hint")
 progressive_toggle = Toggle(20, 70, 60, 25, progressive, "Progressive")
-speed_slider = Slider(20, 120, 120, 15, 1.0, 10.0, speed, "Speed")
+speed_slider = Slider(20, 120, 120, 15, 3.2, 4.6, speed, "Speed")
 
 def clear():
     current_speed = getCurrentGoblinSpeed()
