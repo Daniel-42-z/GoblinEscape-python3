@@ -1,8 +1,8 @@
 import pygame, sys, math
 
 # Game constants
-width = 1024
-height = 720
+base_width = 1024
+base_height = 720
 radius = 300.0
 
 # Game variables
@@ -17,6 +17,11 @@ clicking = False
 with_hint = False
 progressive = True
 speed = 4.0
+scale = 1.0  # New scale variable
+
+# Calculated dimensions based on scale
+width = int(base_width * scale)
+height = int(base_height * scale)
 
 # UI Classes
 class Toggle:
@@ -42,6 +47,35 @@ class Toggle:
         # Draw toggle text
         text = "ON" if self.value else "OFF"
         text_surface = self.font.render(text, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+        
+        # Draw label
+        label_surface = self.font.render(self.label, True, (255, 255, 255))
+        surface.blit(label_surface, (self.rect.x, self.rect.y - 20))
+
+class ScaleToggle:
+    def __init__(self, x, y, width, height, label):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.label = label
+        self.font = pygame.font.Font(None, 20)
+        
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+    
+    def draw(self, surface):
+        global scale
+        # Draw toggle background
+        color = (100, 100, 200)
+        pygame.draw.rect(surface, color, self.rect)
+        pygame.draw.rect(surface, (255, 255, 255), self.rect, 2)
+        
+        # Draw scale text
+        scale_text = "1x" if scale == 1.0 else "0.5x"
+        text_surface = self.font.render(scale_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=self.rect.center)
         surface.blit(text_surface, text_rect)
         
@@ -95,6 +129,12 @@ class Slider:
         label_surface = self.font.render(label_text, True, (255, 255, 255))
         surface.blit(label_surface, (self.rect.x, self.rect.y - 20))
 
+def updateScale():
+    global width, height, window
+    width = int(base_width * scale)
+    height = int(base_height * scale)
+    window = pygame.display.set_mode((width, height))
+
 def getCurrentGoblinSpeed():
     if progressive:
         return gspeeds[gspeed_ix]
@@ -110,28 +150,30 @@ def restart():
 
 # Initialize pygame FIRST
 pygame.init()
-window = pygame.display.set_mode((width, height)) 
+window = pygame.display.set_mode((width, height))
 
 # NOW create UI elements after pygame is initialized
 hint_toggle = Toggle(20, 20, 60, 25, with_hint, "Show Hint")
 progressive_toggle = Toggle(20, 70, 60, 25, progressive, "Progressive")
 speed_slider = Slider(20, 120, 120, 15, 3.2, 4.6, speed, "Speed")
+scale_toggle = ScaleToggle(20, 170, 60, 25, "Scale")  # New scale toggle
 
 def clear():
     current_speed = getCurrentGoblinSpeed()
     radius_mult = bspeed / current_speed
     window.fill((0,80,0))
-    pygame.draw.circle(window, (0,0,128), (int(width/2), int(height/2)), int(radius*1.00), 0)
+    pygame.draw.circle(window, (0,0,128), (int(width/2), int(height/2)), int(radius*scale*1.00), 0)
     if with_hint:
-        pygame.draw.circle(window, (200,200,200), (int(width/2), int(height/2)), int(radius*radius_mult), 1)
+        pygame.draw.circle(window, (200,200,200), (int(width/2), int(height/2)), int(radius*scale*radius_mult), 1)
 
 def redraw(draw_text=False,win=False):
     clear()
-    pygame.draw.circle(window, (255,255,255), (int(width/2 + boatx),int(height/2 + boaty)), 6, 2)
-    pygame.draw.circle(window, (255,0,0), (int(width/2 + radius*math.cos(goblin)),int(height/2 + radius*math.sin(goblin))), 6, 0)
+    pygame.draw.circle(window, (255,255,255), (int(width/2 + boatx*scale),int(height/2 + boaty*scale)), max(1, int(6*scale)), 2)
+    pygame.draw.circle(window, (255,0,0), (int(width/2 + radius*scale*math.cos(goblin)),int(height/2 + radius*scale*math.sin(goblin))), max(1, int(6*scale)), 0)
     
     if draw_text:
-        font = pygame.font.Font(None, 72)
+        font_size = max(36, int(72*scale))
+        font = pygame.font.Font(None, font_size)
         if win:
             text = font.render("Escaped!", 1, (255, 255, 255))
         else:
@@ -142,18 +184,20 @@ def redraw(draw_text=False,win=False):
         window.blit(text, textpos)
     
     # Draw speed info
-    font = pygame.font.Font(None, 48)
+    font_size = max(24, int(48*scale))
+    font = pygame.font.Font(None, font_size)
     current_speed = getCurrentGoblinSpeed()
     mode_text = " (Progressive)" if progressive else " (Constant)"
     text = font.render("Goblin Speed: " + str(current_speed) + mode_text, 1, (255, 255, 255))
     textpos = text.get_rect()
     textpos.centerx = width/2
-    textpos.centery = height - 20
+    textpos.centery = height - int(20*scale)
     window.blit(text, textpos)
     
     # Draw UI elements
     hint_toggle.draw(window)
     progressive_toggle.draw(window)
+    scale_toggle.draw(window)  # Draw the new scale toggle
     if not progressive:  # Only show speed slider in constant mode
         speed_slider.draw(window)
         
@@ -184,7 +228,7 @@ def moveBoat(x,y):
     else:
         boatx += bspeed * speed_mult * dx/mag
         boaty += bspeed * speed_mult * dy/mag 
-    
+
 def detectWin():
     global gspeed_ix
     if boatx*boatx + boaty*boaty > radius*radius:
@@ -221,6 +265,12 @@ while True:
         if not progressive:
             ui_handled |= speed_slider.handle_event(event)
         
+        # Handle scale toggle
+        if scale_toggle.handle_event(event):
+            scale = 0.5 if scale == 1.0 else 1.0  # Toggle between 1.0 and 0.5
+            updateScale()
+            ui_handled = True
+        
         # Update global variables from UI
         with_hint = hint_toggle.value
         progressive = progressive_toggle.value
@@ -239,10 +289,11 @@ while True:
         # Check if mouse is not over UI elements
         if not (hint_toggle.rect.collidepoint(mouse_pos) or 
                 progressive_toggle.rect.collidepoint(mouse_pos) or 
+                scale_toggle.rect.collidepoint(mouse_pos) or
                 (not progressive and speed_slider.rect.collidepoint(mouse_pos))):
             clicking = True
             x, y = mouse_pos
-            moveBoat(x - width/2, y - height/2)
+            moveBoat((x - width/2)/scale, (y - height/2)/scale)  # Scale mouse coordinates
     else:
         clicking = False
     
